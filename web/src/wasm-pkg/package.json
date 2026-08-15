@@ -1,0 +1,20 @@
+{
+  "name": "artifact-wasm",
+  "type": "module",
+  "version": "0.1.0",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jpequegn/decision-artifact-compiler"
+  },
+  "files": [
+    "artifact_wasm_bg.wasm",
+    "artifact_wasm.js",
+    "artifact_wasm.d.ts"
+  ],
+  "main": "artifact_wasm.js",
+  "types": "artifact_wasm.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

@@ -1,0 +1,17 @@
+[package]
+name = "artifact-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+artifact-core = { path = "../artifact-core" }
+serde-wasm-bindgen = "0.6.5"
+wasm-bindgen = "0.2.104"
+
+[lints]
+workspace = true

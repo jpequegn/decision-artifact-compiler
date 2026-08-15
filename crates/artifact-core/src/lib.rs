@@ -5,6 +5,7 @@ mod model;
 mod parser;
 mod policy;
 mod reconciliation;
+mod review;
 mod validation;
 
 pub use compiler::{
@@ -20,6 +21,9 @@ pub use policy::{PolicyDecision, PolicyError, PolicyReport, enforce_policy};
 pub use reconciliation::{
     CheckReceipt, ReconciliationDiagnostic, ReconciliationError, ReconciliationOutcome,
     ReconciliationProposal, ResultArtifact, ResultEvidence, ResultStatus, reconcile_results,
+};
+pub use review::{
+    ArtifactDiff, ReviewDiagnostic, ReviewSnapshot, SemanticChange, review_source, semantic_diff,
 };
 pub use validation::{Diagnostic, ValidationError, artifact_json_schema, validate_artifact};
 
