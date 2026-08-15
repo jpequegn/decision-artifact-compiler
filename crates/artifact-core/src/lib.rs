@@ -3,6 +3,7 @@
 mod compiler;
 mod model;
 mod parser;
+mod policy;
 mod validation;
 
 pub use compiler::{
@@ -14,6 +15,7 @@ pub use model::{
     Gate, GateKind, InputBinding, Reconciliation, ReconciliationMode, RiskClass, SourceSpan, Task,
 };
 pub use parser::{ArtifactError, parse_artifact};
+pub use policy::{PolicyDecision, PolicyError, PolicyReport, enforce_policy};
 pub use validation::{Diagnostic, ValidationError, artifact_json_schema, validate_artifact};
 
 /// Supported decision artifact format version.

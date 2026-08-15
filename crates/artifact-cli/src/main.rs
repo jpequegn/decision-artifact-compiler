@@ -2,8 +2,8 @@ use std::{fs, path::PathBuf};
 
 use anyhow::{Context, Result, bail};
 use artifact_core::{
-    ValidationError, artifact_json_schema, compile_artifact, compile_report, export_plan,
-    parse_artifact, validate_artifact,
+    ValidationError, artifact_json_schema, compile_artifact, compile_report, enforce_policy,
+    export_plan, parse_artifact, validate_artifact,
 };
 use clap::{Parser, Subcommand, ValueEnum};
 
@@ -88,7 +88,7 @@ fn load(path: &PathBuf) -> Result<artifact_core::DecisionArtifact> {
 
 fn validate(artifact: &artifact_core::DecisionArtifact) -> Result<()> {
     match validate_artifact(artifact) {
-        Ok(()) => Ok(()),
+        Ok(()) => enforce_policy(artifact).map(|_| ()).map_err(Into::into),
         Err(ValidationError::Invalid { diagnostics }) => {
             eprintln!("{}", serde_json::to_string_pretty(&diagnostics)?);
             bail!("artifact failed validation")
