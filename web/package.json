@@ -1,0 +1,21 @@
+{
+  "name": "decision-artifact-review",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -b && vite build",
+    "test": "vitest run",
+    "wasm": "npx --yes wasm-pack build ../crates/artifact-wasm --target web --out-dir ../../web/src/wasm-pkg"
+  },
+  "dependencies": {
+    "lucide": "^1.31.0",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.2.1",
+    "vitest": "^4.1.10"
+  }
+}

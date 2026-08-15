@@ -4,3 +4,8 @@
 *.db
 *.db-shm
 *.db-wal
+/web/node_modules
+/web/dist
+/output
+/.playwright-cli
+*.tsbuildinfo
