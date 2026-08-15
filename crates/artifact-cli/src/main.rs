@@ -1,5 +1,7 @@
-use std::path::PathBuf;
+use std::{fs, path::PathBuf};
 
+use anyhow::{Context, Result, bail};
+use artifact_core::{ValidationError, artifact_json_schema, parse_artifact, validate_artifact};
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
@@ -32,28 +34,52 @@ enum Command {
     },
 }
 
-fn main() {
+fn main() -> Result<()> {
     match Cli::parse().command {
         Command::FormatVersion => println!("{}", artifact_core::artifact_format_version()),
         Command::Validate { artifact } => {
-            println!("validation is not implemented: {}", artifact.display());
+            let parsed = load(&artifact)?;
+            validate(&parsed)?;
+            println!(
+                "valid artifact: {} ({} tasks)",
+                parsed.id,
+                parsed.tasks.len()
+            );
         }
         Command::Compile { artifact, output } => {
-            println!(
-                "compilation is not implemented: {} -> {}",
-                artifact.display(),
-                output
-                    .as_ref()
-                    .map_or("stdout".to_owned(), |path| path.display().to_string())
-            );
+            let parsed = load(&artifact)?;
+            validate(&parsed)?;
+            write(output.as_ref(), &serde_json::to_string_pretty(&parsed)?)?;
         }
         Command::Schema { output } => {
-            println!(
-                "schema generation is not implemented: {}",
-                output
-                    .as_ref()
-                    .map_or("stdout".to_owned(), |path| path.display().to_string())
-            );
+            write(output.as_ref(), &artifact_json_schema()?)?;
         }
     }
+    Ok(())
+}
+
+fn load(path: &PathBuf) -> Result<artifact_core::DecisionArtifact> {
+    let source =
+        fs::read_to_string(path).with_context(|| format!("failed to read {}", path.display()))?;
+    parse_artifact(&source).map_err(Into::into)
+}
+
+fn validate(artifact: &artifact_core::DecisionArtifact) -> Result<()> {
+    match validate_artifact(artifact) {
+        Ok(()) => Ok(()),
+        Err(ValidationError::Invalid { diagnostics }) => {
+            eprintln!("{}", serde_json::to_string_pretty(&diagnostics)?);
+            bail!("artifact failed validation")
+        }
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn write(output: Option<&PathBuf>, content: &str) -> Result<()> {
+    if let Some(path) = output {
+        fs::write(path, content).with_context(|| format!("failed to write {}", path.display()))?;
+    } else {
+        println!("{content}");
+    }
+    Ok(())
 }
