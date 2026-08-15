@@ -40,7 +40,19 @@ fn validates_and_compiles_the_example() {
         .args(["compile", example])
         .assert()
         .success()
-        .stdout(predicate::str::contains("repository-change"));
+        .stdout(predicate::str::contains("artifact_digest"));
+    Command::cargo_bin("decision-artifact")
+        .expect("binary")
+        .args(["compile", example, "--format", "plan"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("artifact-worker"));
+    Command::cargo_bin("decision-artifact")
+        .expect("binary")
+        .args(["compile", example, "--format", "report"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Compile report"));
 }
 
 #[test]
