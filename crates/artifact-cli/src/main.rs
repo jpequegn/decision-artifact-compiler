@@ -5,6 +5,7 @@ use artifact_core::{
     ValidationError, artifact_json_schema, compile_artifact, compile_report, enforce_policy,
     export_plan, parse_artifact, validate_artifact,
 };
+use artifact_runtime::{DispatchOptions, FakeWorker, Ledger, dispatch};
 use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Debug, Parser)]
@@ -36,6 +37,24 @@ enum Command {
     Schema {
         #[arg(short, long)]
         output: Option<PathBuf>,
+    },
+    /// Execute a validated artifact with the deterministic worker.
+    Dispatch {
+        artifact: PathBuf,
+        #[arg(long, default_value = "artifact-runs.db")]
+        ledger: PathBuf,
+    },
+    /// Inspect hash-verified receipts for a run.
+    Inspect {
+        run_id: String,
+        #[arg(long, default_value = "artifact-runs.db")]
+        ledger: PathBuf,
+    },
+    /// Reconstruct terminal state from receipts without worker calls.
+    Replay {
+        run_id: String,
+        #[arg(long, default_value = "artifact-runs.db")]
+        ledger: PathBuf,
     },
 }
 
@@ -75,6 +94,34 @@ fn main() -> Result<()> {
         }
         Command::Schema { output } => {
             write(output.as_ref(), &artifact_json_schema()?)?;
+        }
+        Command::Dispatch { artifact, ledger } => {
+            let parsed = load(&artifact)?;
+            validate(&parsed)?;
+            let compiled = compile_artifact(&parsed)?;
+            let ledger = Ledger::open(ledger)?;
+            let runtime = tokio::runtime::Runtime::new()?;
+            let summary = runtime.block_on(dispatch(
+                &compiled,
+                std::sync::Arc::new(FakeWorker::default()),
+                &ledger,
+                &DispatchOptions::default(),
+            ))?;
+            println!("{}", serde_json::to_string_pretty(&summary)?);
+        }
+        Command::Inspect { run_id, ledger } => {
+            let ledger = Ledger::open(ledger)?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&ledger.inspect(&run_id)?)?
+            );
+        }
+        Command::Replay { run_id, ledger } => {
+            let ledger = Ledger::open(ledger)?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&ledger.replay(&run_id)?)?
+            );
         }
     }
     Ok(())

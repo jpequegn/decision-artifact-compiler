@@ -12,8 +12,10 @@ path = "src/main.rs"
 [dependencies]
 anyhow = "1.0.100"
 artifact-core = { path = "../artifact-core" }
+artifact-runtime = { path = "../artifact-runtime" }
 clap = { version = "4.5.47", features = ["derive"] }
 serde_json = "1.0.145"
+tokio = { version = "1.47.1", features = ["rt-multi-thread"] }
 
 [dev-dependencies]
 assert_cmd = "2.0.17"
