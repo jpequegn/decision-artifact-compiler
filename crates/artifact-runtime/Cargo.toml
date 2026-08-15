@@ -1,0 +1,23 @@
+[package]
+name = "artifact-runtime"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+artifact-core = { path = "../artifact-core" }
+async-trait = "0.1.89"
+futures = "0.3.31"
+rusqlite = { version = "0.37.0", features = ["bundled"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+sha2 = "0.10.9"
+thiserror = "2.0.16"
+tokio = { version = "1.47.1", features = ["macros", "rt-multi-thread", "time"] }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+
+[lints]
+workspace = true

@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/artifact-cli", "crates/artifact-core"]
+members = ["crates/artifact-cli", "crates/artifact-core", "crates/artifact-runtime"]
 resolver = "2"
 
 [workspace.package]
