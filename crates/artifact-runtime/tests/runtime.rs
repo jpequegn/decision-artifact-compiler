@@ -1,16 +1,41 @@
 use std::{
     collections::BTreeSet,
-    sync::Arc,
-    time::{Duration, Instant},
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::Duration,
 };
 
 use artifact_core::{compile_artifact, parse_artifact};
-use artifact_runtime::{DispatchOptions, FakeWorker, Ledger, RuntimeError, TaskState, dispatch};
+use artifact_runtime::{
+    DispatchOptions, FakeWorker, Ledger, RuntimeError, TaskState, Worker, WorkerError,
+    WorkerRequest, WorkerResult, dispatch,
+};
 
 const EXAMPLE: &str = include_str!("../../../examples/repository-change.md");
 
 fn compiled() -> artifact_core::CompiledArtifact {
     compile_artifact(&parse_artifact(EXAMPLE).expect("parse")).expect("compile")
+}
+
+struct CountingWorker {
+    active: AtomicUsize,
+    peak: AtomicUsize,
+}
+
+#[async_trait::async_trait]
+impl Worker for CountingWorker {
+    async fn execute(&self, request: WorkerRequest) -> Result<WorkerResult, WorkerError> {
+        let active = self.active.fetch_add(1, Ordering::SeqCst) + 1;
+        self.peak.fetch_max(active, Ordering::SeqCst);
+        tokio::time::sleep(Duration::from_millis(40)).await;
+        self.active.fetch_sub(1, Ordering::SeqCst);
+        Ok(WorkerResult {
+            output: serde_json::json!({"task_id": request.task_id}),
+            worker: "counting".to_owned(),
+        })
+    }
 }
 
 #[tokio::test]
@@ -66,24 +91,25 @@ async fn failed_tasks_cancel_their_dependency_chain() {
 #[tokio::test]
 async fn independent_tasks_run_under_the_concurrency_cap() {
     let mut artifact = compiled();
-    artifact.tasks[1].dependencies.clear();
-    artifact.tasks[2].dependencies.clear();
+    for task in &mut artifact.tasks {
+        task.dependencies.clear();
+    }
     artifact.budgets.concurrency_limit = 3;
     let directory = tempfile::tempdir().expect("tempdir");
     let ledger = Ledger::open(directory.path().join("runs.db")).expect("ledger");
-    let start = Instant::now();
+    let worker = Arc::new(CountingWorker {
+        active: AtomicUsize::new(0),
+        peak: AtomicUsize::new(0),
+    });
     dispatch(
         &artifact,
-        Arc::new(FakeWorker {
-            delay_ms: 80,
-            fail_tasks: BTreeSet::new(),
-        }),
+        worker.clone(),
         &ledger,
         &DispatchOptions::default(),
     )
     .await
     .expect("dispatch");
-    assert!(start.elapsed() < Duration::from_millis(200));
+    assert_eq!(worker.peak.load(Ordering::SeqCst), 3);
 }
 
 #[tokio::test]

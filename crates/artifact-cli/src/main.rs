@@ -3,7 +3,7 @@ use std::{fs, path::PathBuf};
 use anyhow::{Context, Result, bail};
 use artifact_core::{
     ValidationError, artifact_json_schema, compile_artifact, compile_report, enforce_policy,
-    export_plan, parse_artifact, validate_artifact,
+    export_plan, parse_artifact, reconcile_results, validate_artifact,
 };
 use artifact_runtime::{DispatchOptions, FakeWorker, Ledger, dispatch};
 use clap::{Parser, Subcommand, ValueEnum};
@@ -55,6 +55,13 @@ enum Command {
         run_id: String,
         #[arg(long, default_value = "artifact-runs.db")]
         ledger: PathBuf,
+    },
+    /// Validate worker results and emit a review-only Markdown patch.
+    Reconcile {
+        artifact: PathBuf,
+        results: PathBuf,
+        #[arg(short, long)]
+        output: Option<PathBuf>,
     },
 }
 
@@ -122,6 +129,26 @@ fn main() -> Result<()> {
                 "{}",
                 serde_json::to_string_pretty(&ledger.replay(&run_id)?)?
             );
+        }
+        Command::Reconcile {
+            artifact,
+            results,
+            output,
+        } => {
+            let parsed = load(&artifact)?;
+            validate(&parsed)?;
+            let compiled = compile_artifact(&parsed)?;
+            let results: Vec<artifact_core::ResultArtifact> = serde_json::from_str(
+                &fs::read_to_string(&results)
+                    .with_context(|| format!("failed to read {}", results.display()))?,
+            )?;
+            let proposal = reconcile_results(&compiled, &results).map_err(|error| {
+                anyhow::anyhow!(
+                    "reconciliation failed: {}",
+                    serde_json::to_string_pretty(&error.diagnostics).unwrap_or_default()
+                )
+            })?;
+            write(output.as_ref(), &proposal.markdown_patch)?;
         }
     }
     Ok(())
