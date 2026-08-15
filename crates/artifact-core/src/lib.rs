@@ -4,6 +4,7 @@ mod compiler;
 mod model;
 mod parser;
 mod policy;
+mod reconciliation;
 mod validation;
 
 pub use compiler::{
@@ -16,6 +17,10 @@ pub use model::{
 };
 pub use parser::{ArtifactError, parse_artifact};
 pub use policy::{PolicyDecision, PolicyError, PolicyReport, enforce_policy};
+pub use reconciliation::{
+    CheckReceipt, ReconciliationDiagnostic, ReconciliationError, ReconciliationOutcome,
+    ReconciliationProposal, ResultArtifact, ResultEvidence, ResultStatus, reconcile_results,
+};
 pub use validation::{Diagnostic, ValidationError, artifact_json_schema, validate_artifact};
 
 /// Supported decision artifact format version.

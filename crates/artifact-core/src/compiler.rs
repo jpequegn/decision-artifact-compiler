@@ -6,7 +6,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     AcceptanceCheck, ApprovalStatus, Authority, Budget, DecisionArtifact, Gate, InputBinding,
-    RiskClass, SourceSpan,
+    Reconciliation, RiskClass, SourceSpan,
 };
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -63,6 +63,7 @@ pub struct CompiledArtifact {
     pub budgets: Budget,
     pub policy_digest: String,
     pub evidence: Vec<CompiledEvidence>,
+    pub reconciliation: Reconciliation,
     pub tasks: Vec<CompiledTask>,
     pub source: SourceSpan,
 }
@@ -145,6 +146,7 @@ pub fn compile_artifact(
         budgets: artifact.budgets.clone(),
         policy_digest,
         evidence,
+        reconciliation: artifact.reconciliation.clone(),
         tasks,
         source: artifact.span.clone(),
     };
