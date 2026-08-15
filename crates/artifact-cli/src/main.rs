@@ -1,8 +1,11 @@
 use std::{fs, path::PathBuf};
 
 use anyhow::{Context, Result, bail};
-use artifact_core::{ValidationError, artifact_json_schema, parse_artifact, validate_artifact};
-use clap::{Parser, Subcommand};
+use artifact_core::{
+    ValidationError, artifact_json_schema, compile_artifact, compile_report, export_plan,
+    parse_artifact, validate_artifact,
+};
+use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -24,6 +27,8 @@ enum Command {
     /// Compile an artifact to canonical JSON.
     Compile {
         artifact: PathBuf,
+        #[arg(long, value_enum, default_value_t = CompileFormat::Ir)]
+        format: CompileFormat,
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
@@ -32,6 +37,13 @@ enum Command {
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum CompileFormat {
+    Ir,
+    Plan,
+    Report,
 }
 
 fn main() -> Result<()> {
@@ -46,10 +58,20 @@ fn main() -> Result<()> {
                 parsed.tasks.len()
             );
         }
-        Command::Compile { artifact, output } => {
+        Command::Compile {
+            artifact,
+            format,
+            output,
+        } => {
             let parsed = load(&artifact)?;
             validate(&parsed)?;
-            write(output.as_ref(), &serde_json::to_string_pretty(&parsed)?)?;
+            let compiled = compile_artifact(&parsed)?;
+            let content = match format {
+                CompileFormat::Ir => serde_json::to_string_pretty(&compiled)?,
+                CompileFormat::Plan => serde_json::to_string_pretty(&export_plan(&compiled))?,
+                CompileFormat::Report => compile_report(&compiled),
+            };
+            write(output.as_ref(), &content)?;
         }
         Command::Schema { output } => {
             write(output.as_ref(), &artifact_json_schema()?)?;

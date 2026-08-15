@@ -1,9 +1,14 @@
 //! Core contracts, parsing, and validation for approved decision artifacts.
 
+mod compiler;
 mod model;
 mod parser;
 mod validation;
 
+pub use compiler::{
+    CompiledArtifact, CompiledEvidence, CompiledTask, PlanLimits, PlanNode, PlanRunnerExport,
+    Provenance, Provenanced, compile_artifact, compile_report, export_plan,
+};
 pub use model::{
     AcceptanceCheck, AcceptanceKind, ApprovalStatus, Authority, Budget, DecisionArtifact, Evidence,
     Gate, GateKind, InputBinding, Reconciliation, ReconciliationMode, RiskClass, SourceSpan, Task,
