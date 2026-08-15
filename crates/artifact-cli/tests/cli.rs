@@ -22,3 +22,33 @@ fn prints_supported_format_version() {
         .success()
         .stdout("v1\n");
 }
+
+#[test]
+fn validates_and_compiles_the_example() {
+    let example = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../examples/repository-change.md"
+    );
+    Command::cargo_bin("decision-artifact")
+        .expect("binary")
+        .args(["validate", example])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("3 tasks"));
+    Command::cargo_bin("decision-artifact")
+        .expect("binary")
+        .args(["compile", example])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("repository-change"));
+}
+
+#[test]
+fn prints_schema() {
+    Command::cargo_bin("decision-artifact")
+        .expect("binary")
+        .arg("schema")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("concurrency_limit"));
+}

@@ -1,4 +1,15 @@
-//! Core contracts for approved decision artifacts.
+//! Core contracts, parsing, and validation for approved decision artifacts.
+
+mod model;
+mod parser;
+mod validation;
+
+pub use model::{
+    AcceptanceCheck, AcceptanceKind, ApprovalStatus, Authority, Budget, DecisionArtifact, Evidence,
+    Gate, GateKind, InputBinding, Reconciliation, ReconciliationMode, RiskClass, SourceSpan, Task,
+};
+pub use parser::{ArtifactError, parse_artifact};
+pub use validation::{Diagnostic, ValidationError, artifact_json_schema, validate_artifact};
 
 /// Supported decision artifact format version.
 pub const ARTIFACT_FORMAT_VERSION: &str = "v1";

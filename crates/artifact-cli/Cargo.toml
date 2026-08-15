@@ -10,8 +10,10 @@ name = "decision-artifact"
 path = "src/main.rs"
 
 [dependencies]
+anyhow = "1.0.100"
 artifact-core = { path = "../artifact-core" }
 clap = { version = "4.5.47", features = ["derive"] }
+serde_json = "1.0.145"
 
 [dev-dependencies]
 assert_cmd = "2.0.17"
