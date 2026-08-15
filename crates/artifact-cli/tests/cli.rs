@@ -64,3 +64,58 @@ fn prints_schema() {
         .success()
         .stdout(predicate::str::contains("concurrency_limit"));
 }
+
+#[test]
+fn runs_the_documented_end_to_end_workflow() {
+    let example = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../examples/repository-change.md"
+    );
+    let directory = tempfile::tempdir().expect("tempdir");
+    let ledger = directory.path().join("runs.db");
+    let results = directory.path().join("results.json");
+    let patch = directory.path().join("proposal.md");
+    let output = Command::cargo_bin("decision-artifact")
+        .expect("binary")
+        .args([
+            "dispatch",
+            example,
+            "--ledger",
+            ledger.to_str().expect("ledger path"),
+            "--results",
+            results.to_str().expect("results path"),
+        ])
+        .output()
+        .expect("dispatch output");
+    assert!(output.status.success());
+    let summary: serde_json::Value = serde_json::from_slice(&output.stdout).expect("summary");
+    let run_id = summary["run_id"].as_str().expect("run id");
+
+    Command::cargo_bin("decision-artifact")
+        .expect("binary")
+        .args([
+            "replay",
+            run_id,
+            "--ledger",
+            ledger.to_str().expect("ledger path"),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("completed"));
+    Command::cargo_bin("decision-artifact")
+        .expect("binary")
+        .args([
+            "reconcile",
+            example,
+            results.to_str().expect("results path"),
+            "--output",
+            patch.to_str().expect("patch path"),
+        ])
+        .assert()
+        .success();
+    assert!(
+        std::fs::read_to_string(patch)
+            .expect("proposal")
+            .contains("Reconciliation proposal")
+    );
+}

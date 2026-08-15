@@ -43,6 +43,8 @@ enum Command {
         artifact: PathBuf,
         #[arg(long, default_value = "artifact-runs.db")]
         ledger: PathBuf,
+        #[arg(long)]
+        results: Option<PathBuf>,
     },
     /// Inspect hash-verified receipts for a run.
     Inspect {
@@ -102,7 +104,11 @@ fn main() -> Result<()> {
         Command::Schema { output } => {
             write(output.as_ref(), &artifact_json_schema()?)?;
         }
-        Command::Dispatch { artifact, ledger } => {
+        Command::Dispatch {
+            artifact,
+            ledger,
+            results,
+        } => {
             let parsed = load(&artifact)?;
             validate(&parsed)?;
             let compiled = compile_artifact(&parsed)?;
@@ -114,6 +120,10 @@ fn main() -> Result<()> {
                 &ledger,
                 &DispatchOptions::default(),
             ))?;
+            if let Some(path) = results {
+                fs::write(&path, serde_json::to_string_pretty(&summary.results)?)
+                    .with_context(|| format!("failed to write {}", path.display()))?;
+            }
             println!("{}", serde_json::to_string_pretty(&summary)?);
         }
         Command::Inspect { run_id, ledger } => {

@@ -78,6 +78,7 @@ dependencies = [
  "clap",
  "predicates",
  "serde_json",
+ "tempfile",
  "tokio",
 ]
 
@@ -93,6 +94,18 @@ dependencies = [
  "serde_yaml",
  "sha2",
  "thiserror",
+]
+
+[[package]]
+name = "artifact-eval"
+version = "0.1.0"
+dependencies = [
+ "artifact-core",
+ "artifact-runtime",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
 ]
 
 [[package]]

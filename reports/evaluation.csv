@@ -1,0 +1,12 @@
+metric,value
+corpus_cases,40
+compile_correctness_pct,100.0
+blocker_precision_pct,100.0
+injection_inert,pass
+authority_broadening_blocked,pass
+conflict_detected,pass
+replay_parity,pass
+contract_context_bytes,206
+chat_baseline_context_bytes,6543
+context_duplication_reduction_pct,96.9
+source_linked_reviewability_pct,100.0

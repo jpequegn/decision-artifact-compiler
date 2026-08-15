@@ -4,6 +4,7 @@ members = [
   "crates/artifact-core",
   "crates/artifact-runtime",
   "crates/artifact-wasm",
+  "crates/artifact-eval",
 ]
 resolver = "2"
 

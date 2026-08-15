@@ -7,7 +7,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "test": "vitest run",
-    "wasm": "npx --yes wasm-pack build ../crates/artifact-wasm --target web --out-dir ../../web/src/wasm-pkg"
+    "wasm": "npx --yes wasm-pack@0.15.0 build ../crates/artifact-wasm --target web --out-dir ../../web/src/wasm-pkg"
   },
   "dependencies": {
     "lucide": "^1.31.0",

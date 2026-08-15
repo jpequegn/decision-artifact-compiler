@@ -10,7 +10,10 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use artifact_core::{Authority, CompiledArtifact, CompiledTask, InputBinding};
+use artifact_core::{
+    Authority, CheckReceipt, CompiledArtifact, CompiledTask, InputBinding, ResultArtifact,
+    ResultEvidence, ResultStatus,
+};
 use async_trait::async_trait;
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
@@ -96,6 +99,7 @@ pub struct RunSummary {
     pub artifact_digest: String,
     pub states: BTreeMap<String, TaskState>,
     pub outputs: BTreeMap<String, Value>,
+    pub results: Vec<ResultArtifact>,
 }
 
 #[derive(Debug, Error)]
@@ -203,6 +207,18 @@ impl Ledger {
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     }
 
+    /// Return the latest receipt sequence in the ledger.
+    ///
+    /// # Errors
+    /// Returns `SQLite` query failures.
+    pub fn last_sequence(&self) -> Result<u64, RuntimeError> {
+        self.connection
+            .query_row("SELECT COALESCE(MAX(seq), 0) FROM receipts", [], |row| {
+                row.get(0)
+            })
+            .map_err(Into::into)
+    }
+
     fn verify_chain(&self) -> Result<(), RuntimeError> {
         let mut statement = self.connection.prepare(
             "SELECT seq, run_id, kind, payload, previous_hash, entry_hash FROM receipts ORDER BY seq",
@@ -252,6 +268,7 @@ pub async fn dispatch(
     )?;
     let mut states = BTreeMap::new();
     let mut outputs = BTreeMap::new();
+    let mut results = Vec::new();
     let tasks: BTreeMap<_, _> = artifact
         .tasks
         .iter()
@@ -277,15 +294,7 @@ pub async fn dispatch(
         ready.sort_by(|left, right| left.id.cmp(&right.id));
         ready.truncate(artifact.budgets.concurrency_limit);
         if ready.is_empty() {
-            let blocked: Vec<_> = tasks
-                .keys()
-                .filter(|task_id| !states.contains_key(*task_id))
-                .cloned()
-                .collect();
-            for task_id in blocked {
-                states.insert(task_id.clone(), TaskState::Blocked);
-                ledger.append(&run_id, "task_blocked", &json!({"task_id": task_id}))?;
-            }
+            block_remaining(artifact, &tasks, &mut states, &mut results, ledger, &run_id)?;
             break;
         }
 
@@ -302,6 +311,7 @@ pub async fn dispatch(
         });
         for (task_id, request, result) in futures::future::join_all(futures).await {
             ledger.append(&run_id, "task_dispatched", &request)?;
+            let dispatch_receipt_seq = ledger.last_sequence()?;
             match result {
                 Ok(result) => {
                     outputs.insert(task_id.clone(), result.output.clone());
@@ -311,6 +321,14 @@ pub async fn dispatch(
                         "task_completed",
                         &json!({"task_id": task_id, "result": result}),
                     )?;
+                    results.push(result_artifact(
+                        artifact,
+                        tasks[&task_id],
+                        &run_id,
+                        ResultStatus::Completed,
+                        result.output,
+                        dispatch_receipt_seq,
+                    ));
                 }
                 Err(error) => {
                     states.insert(task_id.clone(), TaskState::Failed);
@@ -319,18 +337,124 @@ pub async fn dispatch(
                         "task_failed",
                         &json!({"task_id": task_id, "error": error.to_string()}),
                     )?;
+                    results.push(result_artifact(
+                        artifact,
+                        tasks[&task_id],
+                        &run_id,
+                        ResultStatus::Failed,
+                        Value::Null,
+                        dispatch_receipt_seq,
+                    ));
                 }
             }
         }
     }
-    let summary = RunSummary {
-        run_id: run_id.clone(),
+    let summary = run_summary(&run_id, artifact, states, outputs, results);
+    ledger.append(&run_id, "run_completed", &summary)?;
+    Ok(summary)
+}
+
+fn run_summary(
+    run_id: &str,
+    artifact: &CompiledArtifact,
+    states: BTreeMap<String, TaskState>,
+    outputs: BTreeMap<String, Value>,
+    results: Vec<ResultArtifact>,
+) -> RunSummary {
+    RunSummary {
+        run_id: run_id.to_owned(),
         artifact_digest: artifact.artifact_digest.clone(),
         states,
         outputs,
-    };
-    ledger.append(&run_id, "run_completed", &summary)?;
-    Ok(summary)
+        results,
+    }
+}
+
+fn block_remaining(
+    artifact: &CompiledArtifact,
+    tasks: &BTreeMap<String, &CompiledTask>,
+    states: &mut BTreeMap<String, TaskState>,
+    results: &mut Vec<ResultArtifact>,
+    ledger: &Ledger,
+    run_id: &str,
+) -> Result<(), RuntimeError> {
+    let blocked: Vec<_> = tasks
+        .keys()
+        .filter(|task_id| !states.contains_key(*task_id))
+        .cloned()
+        .collect();
+    for task_id in blocked {
+        states.insert(task_id.clone(), TaskState::Blocked);
+        ledger.append(run_id, "task_blocked", &json!({"task_id": task_id}))?;
+        results.push(result_artifact(
+            artifact,
+            tasks[&task_id],
+            run_id,
+            ResultStatus::Abandoned,
+            Value::Null,
+            0,
+        ));
+    }
+    Ok(())
+}
+
+fn result_artifact(
+    artifact: &CompiledArtifact,
+    task: &CompiledTask,
+    run_id: &str,
+    status: ResultStatus,
+    output: Value,
+    dispatch_receipt_seq: u64,
+) -> ResultArtifact {
+    let passed = status == ResultStatus::Completed;
+    ResultArtifact {
+        version: artifact.format_version.clone(),
+        run_id: run_id.to_owned(),
+        artifact_digest: artifact.artifact_digest.clone(),
+        task_id: task.id.clone(),
+        status,
+        output,
+        evidence: task
+            .evidence
+            .iter()
+            .filter_map(|id| {
+                artifact
+                    .evidence
+                    .iter()
+                    .find(|item| item.id == *id)
+                    .map(|item| ResultEvidence {
+                        id: id.clone(),
+                        digest: item.evidence_digest.clone(),
+                    })
+            })
+            .collect(),
+        checks: task
+            .acceptance
+            .iter()
+            .map(|acceptance| CheckReceipt {
+                check: acceptance.value.clone(),
+                passed,
+                detail: if passed {
+                    "deterministic worker acceptance".to_owned()
+                } else {
+                    "task did not complete".to_owned()
+                },
+            })
+            .collect(),
+        logs: vec![format!("ledger://{run_id}/{}", task.id)],
+        diffs: Vec::new(),
+        citations: task
+            .evidence
+            .iter()
+            .map(|id| format!("evidence://{id}"))
+            .collect(),
+        tests: task
+            .acceptance
+            .iter()
+            .map(|acceptance| acceptance.value.clone())
+            .collect(),
+        dispatch_receipt_seq,
+    }
 }
 
 fn worker_request(
